@@ -7,8 +7,6 @@ blueprint:
     Minuten wird der Soll-Zustand neu berechnet und per MQTT gepusht oder (leerer
     Push) entfernt. Ausfuehrliche Beschreibung: https://github.com/max-t-d/HA_public/blob/main/docs/awtrix-events.md
   domain: automation
-  homeassistant:
-    min_version: 2025.1.0
   source_url: https://github.com/max-t-d/HA_public/blob/main/blueprints/automation/awtrix_events/awtrix_events.yaml
   input:
     grundlagen:
