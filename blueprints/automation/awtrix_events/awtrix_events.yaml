@@ -1,0 +1,332 @@
+blueprint:
+  name: AWTRIX Events
+  description: >-
+    Zeigt Kalendertermine (Geburtstage, Sport, Feiertage, sonstige Termine) auf
+    einer AWTRIX-Matrix. Eine Regelliste ordnet Termintiteln Icon, Text und
+    Zeitfenster zu. Treffer pro App werden zu einem Text verkettet. Alle paar
+    Minuten wird der Soll-Zustand neu berechnet und per MQTT gepusht oder (leerer
+    Push) entfernt. Ausfuehrliche Beschreibung: https://github.com/max-t-d/HA_public/blob/main/docs/awtrix-events.md
+  domain: automation
+  min_version: 2025.1.0
+  source_url: https://github.com/max-t-d/HA_public/blob/main/blueprints/automation/awtrix_events/awtrix_events.yaml
+  input:
+    grundlagen:
+      name: Grundlagen
+      icon: mdi:calendar-clock
+      collapsed: false
+      input:
+        kalender:
+          name: Kalender
+          description: >-
+            Zu ueberwachende Kalender (Mehrfachauswahl).
+          selector:
+            entity:
+              domain: calendar
+              multiple: true
+        awtrix_prefix:
+          name: AWTRIX MQTT-Prefix
+          description: >-
+            MQTT-Prefix der AWTRIX ohne abschliessenden Schraegstrich. Apps werden
+            auf <Prefix>/custom/<app> geschrieben.
+          default: homeassistant/awtrix_ed5528
+          selector:
+            text:
+        ignorieren:
+          name: Ignorieren
+          description: >-
+            Termine, deren Titel einen dieser Begriffe enthaelt, werden komplett
+            uebersprungen, z.B. Abfalltermine, die zusaetzlich in einem
+            Stadtkalender stehen. Ein Begriff pro Zeile, "enthaelt" und ohne
+            Gross-/Kleinschreibung (Beispiel: restmüll, biotonne).
+          default: ""
+          selector:
+            text:
+              multiline: true
+    regelwerk:
+      name: Regeln
+      icon: mdi:format-list-bulleted
+      collapsed: false
+      input:
+        # ---------------------------------------------------------------------
+        # ANLEITUNG: Icon ohne Text (z.B. grosse Animation wie HugeFireworks)
+        #   1. In der Regel das Feld "Nur Icon, kein Text" einschalten. Das
+        #      Formular reicht, YAML ist nicht noetig. Im YAML-Editor der Regeln
+        #      entspricht das  nur_icon: true
+        #   2. Dann wird KEIN text an die AWTRIX gesendet und die Startzeit nicht
+        #      angehaengt. Mehrere Treffer in derselben App: Texte der anderen
+        #      Treffer werden weiter verkettet, nur_icon wirkt nur fuer diesen.
+        #   3. Getestet: Ein 32x8-GIF ohne Text laeuft auf der AWTRIX ueber das
+        #      volle Display (Weihnachten/Silvester, ebenso KITT/Pacman). Falls
+        #      eine andere AWTRIX-Version sich anders verhaelt: in der Regel im
+        #      Feld "Text" ein einzelnes Leerzeichen eintragen (YAML: text: " ")
+        #      und "Nur Icon" wieder ausschalten.
+        #   4. Ein leeres Textfeld im Formular heisst "Titel anzeigen", NICHT
+        #      "kein Text". Kein Text geht nur ueber "Nur Icon" oder text: "".
+        # ---------------------------------------------------------------------
+        regeln:
+          name: Regeln
+          description: >-
+            Pro Regel: app (AWTRIX-App, darf mehrfach vorkommen), match
+            (Suchbegriffe kommagetrennt, "enthaelt", ohne Gross-/Kleinschreibung),
+            icon, optional text ({summary} = Titel, Standard), nur_icon (kein Text),
+            von/bis (Minuten relativ zu Start/Ende, nur Termine mit Uhrzeit),
+            tag_von/tag_bis (Anzeigefenster ganztaegiger Termine), uhrzeit
+            (Startzeit anhaengen, Standard an), duration, color, sound. Es gewinnt
+            die erste passende Regel von oben nach unten.
+          default:
+            - {app: geburtstag, match: "geburtstag, birthday", icon: "102"}
+            - {app: sport, match: "turnen", icon: "35498", von: -90, bis: 0}
+            - {app: sport, match: "schwimmen", icon: "22838", von: -90, bis: 0}
+            - {app: feiertage, match: "advent1", icon: "15289", text: "Advent Advent!"}
+            - {app: feiertage, match: "advent2", icon: "15290", text: "Advent Advent!"}
+            - {app: feiertage, match: "advent3", icon: "15293", text: "Advent Advent!"}
+            - {app: feiertage, match: "advent4", icon: "15294", text: "Advent Advent!"}
+            - {app: feiertage, match: "weihnachten", icon: "ChristmasSleigh", nur_icon: true}
+            - {app: feiertage, match: "silvester", icon: "HugeFireworks", nur_icon: true}
+            - {app: feiertage, match: "neujahr", icon: "26001", text: "Frohes neues Jahr!"}
+          selector:
+            object:
+              multiple: true
+              label_field: match
+              description_field: app
+              fields:
+                app:
+                  label: App
+                  required: true
+                  selector:
+                    text:
+                match:
+                  label: Suchbegriffe (kommagetrennt)
+                  required: true
+                  selector:
+                    text:
+                icon:
+                  label: Icon (ID oder Name)
+                  required: true
+                  selector:
+                    text:
+                text:
+                  label: Text ({summary} = Titel)
+                  selector:
+                    text:
+                nur_icon:
+                  label: Nur Icon, kein Text (z.B. grosse Animation)
+                  selector:
+                    boolean:
+                von:
+                  label: Von (Minuten relativ zum Start, z.B. -90)
+                  selector:
+                    number:
+                      min: -1440
+                      max: 1440
+                      mode: box
+                bis:
+                  label: Bis (Minuten relativ zum Ende)
+                  selector:
+                    number:
+                      min: -1440
+                      max: 1440
+                      mode: box
+                tag_von:
+                  label: Ganztaegig ab
+                  selector:
+                    time:
+                tag_bis:
+                  label: Ganztaegig bis
+                  selector:
+                    time:
+                uhrzeit:
+                  label: Startzeit an den Text haengen
+                  selector:
+                    boolean:
+                duration:
+                  label: Sekunden pro Durchlauf
+                  selector:
+                    number:
+                      min: 1
+                      max: 120
+                      mode: box
+                color:
+                  label: Textfarbe (z.B. #FF0000)
+                  selector:
+                    text:
+                sound:
+                  label: Sound (RTTTL-Name)
+                  selector:
+                    text:
+    erweitert:
+      name: Erweitert
+      icon: mdi:cog
+      collapsed: true
+      input:
+        unbekannte_anzeigen:
+          name: Termine ohne Regel anzeigen
+          description: Aus = Termine ohne passende Regel werden ignoriert.
+          default: true
+          selector:
+            boolean:
+        standard_app:
+          name: App fuer Termine ohne Regel
+          default: termine
+          selector:
+            text:
+        standard_icon:
+          name: Icon fuer Termine ohne Regel
+          default: "2231"
+          selector:
+            text:
+        intervall:
+          name: Abgleich-Intervall
+          description: >-
+            Wie oft der Soll-Zustand neu berechnet wird. Bei CalDAV (iCloud)
+            loest jeder Lauf einen Abruf aus.
+          default: "/5"
+          selector:
+            select:
+              options:
+                - {label: Jede Minute, value: "/1"}
+                - {label: Alle 2 Minuten, value: "/2"}
+                - {label: Alle 5 Minuten, value: "/5"}
+                - {label: Alle 10 Minuten, value: "/10"}
+
+mode: single
+max_exceeded: silent
+
+triggers:
+  - trigger: time_pattern
+    minutes: !input intervall
+  - trigger: homeassistant
+    event: start
+
+variables:
+  kalender: !input kalender
+  prefix: !input awtrix_prefix
+  ignorieren_roh: !input ignorieren
+  regeln: !input regeln
+  zeige_unbekannt: !input unbekannte_anzeigen
+  std_app: !input standard_app
+  std_icon: !input standard_icon
+  max_lifetime: 900
+  ign_liste: >-
+    {{ ignorieren_roh.split('\n') | map('trim') | reject('eq', '') | map('lower') | list }}
+  std: "{{ {'app': std_app, 'icon': std_icon | string} }}"
+
+actions:
+  # Heute und morgen laden: deckt laufende Termine und Vorlauf ueber Mitternacht ab.
+  # Schlaegt der Abruf fehl (z.B. iCloud nicht erreichbar), bricht die Automation
+  # ab, die Apps laufen dann ueber ihre Lifetime kontrolliert aus.
+  - action: calendar.get_events
+    target:
+      entity_id: !input kalender
+    data:
+      start_date_time: "{{ today_at('00:00') }}"
+      duration:
+        days: 2
+    response_variable: kal
+
+  # Aktive Treffer berechnen: eine Liste mit einem Eintrag pro Termin
+  - variables:
+      aktiv: >-
+        {% set ns = namespace(treffer=[]) %}
+        {% set jetzt_ts = now().timestamp() %}
+        {% set heute = now().strftime('%Y-%m-%d') %}
+        {% set uhr = now().strftime('%H:%M') %}
+        {% set d = {'von': 0, 'bis': 0, 'tag_von': '00:00', 'tag_bis': '24:00', 'uhrzeit': true, 'duration': 10} %}
+        {% for kal_id, inhalt in kal.items() %}
+        {% for ev in inhalt.events %}
+        {% set titel = ev.summary | default('') | string %}
+        {% set ganztag = (ev.start | string | length) == 10 %}
+        {% set ign = namespace(ja=false) %}
+        {% for m in ign_liste %}
+        {% if m in (titel | lower) %}{% set ign.ja = true %}{% endif %}
+        {% endfor %}
+        {% if not ign.ja %}
+        {% set sel = namespace(regel=none) %}
+        {% for regel in regeln %}
+        {% if sel.regel is none %}
+        {% for m in ((regel.match.split(',') if regel.match is string else regel.match)) %}
+        {% if (m | string | trim | lower) != '' and (m | string | trim | lower) in (titel | lower) %}{% set sel.regel = regel %}{% endif %}
+        {% endfor %}
+        {% endif %}
+        {% endfor %}
+        {% if sel.regel is not none or zeige_unbekannt %}
+        {% set r = sel.regel if sel.regel is not none else std %}
+        {% set ok = namespace(aktiv=false, rest=900, sk='', zeit='') %}
+        {% if ganztag %}
+        {% set von_t = (r.get('tag_von', d.tag_von) | string)[:5] %}
+        {% set bis_t = (r.get('tag_bis', d.tag_bis) | string)[:5] %}
+        {% if ev.start[:10] <= heute and heute < ev.end[:10] and von_t <= uhr and uhr < bis_t %}
+        {% set ok.aktiv = true %}
+        {% endif %}
+        {% set ok.sk = '0' ~ ev.start[:10] %}
+        {% else %}
+        {% set s = (ev.start | as_timestamp) + (r.get('von', d.von) | int(0)) * 60 %}
+        {% set e = (ev.end | as_timestamp) + (r.get('bis', d.bis) | int(0)) * 60 %}
+        {% if s <= jetzt_ts and jetzt_ts < e %}
+        {% set ok.aktiv = true %}
+        {% set ok.rest = (e - jetzt_ts) | int(900) %}
+        {% endif %}
+        {% set ok.sk = '1' ~ ev.start %}
+        {% set ok.zeit = (ev.start | as_datetime | as_local).strftime('%H:%M') %}
+        {% endif %}
+        {% if ok.aktiv %}
+        {% set txt = r.get('text', '{summary}') | string %}
+        {% set txt = txt.replace('{summary}', titel) %}
+        {% if r.get('nur_icon', false) %}{% set txt = '' %}{% endif %}
+        {% if (not ganztag) and r.get('uhrzeit', d.uhrzeit) and txt != '' %}
+        {% set txt = txt ~ ' ' ~ ok.zeit %}
+        {% endif %}
+        {% set ns.treffer = ns.treffer + [{
+          'app': r.app,
+          'sk': ok.sk,
+          'text': txt,
+          'icon': r.icon | string,
+          'duration': r.get('duration', d.duration) | int(10),
+          'color': r.get('color', ''),
+          'sound': r.get('sound', ''),
+          'rest': ok.rest
+        }] %}
+        {% endif %}
+        {% endif %}
+        {% endif %}
+        {% endfor %}
+        {% endfor %}
+        {{ ns.treffer | sort(attribute='sk') | list }}
+      alle_apps: >-
+        {{ (regeln | map(attribute='app') | list + [std.app]) | unique | list }}
+
+  # Pro App: Treffer zusammenfassen und pushen, sonst App entfernen
+  - repeat:
+      for_each: "{{ alle_apps }}"
+      sequence:
+        - variables:
+            t: "{{ aktiv | selectattr('app', 'eq', repeat.item) | list }}"
+        - choose:
+            - conditions: "{{ t | count > 0 }}"
+              sequence:
+                - action: mqtt.publish
+                  data:
+                    topic: "{{ prefix }}/custom/{{ repeat.item }}"
+                    qos: 0
+                    retain: false
+                    payload: >-
+                      {% set e = t[0] %}
+                      {% set texte = t | map(attribute='text') | select('ne', '') | list %}
+                      {% set p = {
+                        'icon': e.icon,
+                        'duration': e.duration,
+                        'lifetime': [max_lifetime, (t | map(attribute='rest') | min)] | min | int
+                      } %}
+                      {# Leerer Text = Key weglassen (reines Icon) #}
+                      {% if (texte | join(', ')) != '' %}{% set p = dict(p, text=texte | join(', ')) %}{% endif %}
+                      {% if e.color != '' %}{% set p = dict(p, color=e.color) %}{% endif %}
+                      {% if e.sound != '' %}{% set p = dict(p, sound=e.sound) %}{% endif %}
+                      {{ p | tojson }}
+          default:
+            # Leerer Payload entfernt die App von der Uhr
+            - action: mqtt.publish
+              data:
+                topic: "{{ prefix }}/custom/{{ repeat.item }}"
+                qos: 0
+                retain: false
+                payload: ""
