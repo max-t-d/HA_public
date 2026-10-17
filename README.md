@@ -38,6 +38,7 @@ importieren" im Menü des Blueprints an.
 
 ## Hinweise
 
+- Lizenz: [MIT](LICENSE).
 - Alles hier ist ohne Gewähr, Beispielwerte (Icons, MQTT-Prefix, Regeln) sind an
   das eigene Setup anzupassen.
 - Keine Zugangsdaten, Tokens oder private Entity-Listen in dieses Repo.
