@@ -70,7 +70,7 @@ blueprint:
             icon, optional text ({summary} = Titel, Standard), nur_icon (kein Text),
             von/bis (Minuten relativ zu Start/Ende, nur Termine mit Uhrzeit),
             tag_von/tag_bis (Anzeigefenster ganztaegiger Termine), uhrzeit
-            (Startzeit anhaengen, Standard an), duration, color, sound. Es gewinnt
+            (Startzeit anhaengen, Standard an), duration (ueberschreibt die Standard-Dauer), color, sound. Es gewinnt
             die erste passende Regel von oben nach unten.
           default:
             - {app: geburtstag, match: "geburtstag, birthday", icon: "102"}
@@ -174,6 +174,42 @@ blueprint:
           default: "2231"
           selector:
             text:
+        standard_dauer:
+          name: Standard-Dauer (Sekunden)
+          description: >-
+            Anzeigedauer einer App pro Durchlauf, wenn die Regel keine eigene
+            "Sekunden pro Durchlauf" hat.
+          default: 10
+          selector:
+            number:
+              min: 1
+              max: 120
+              unit_of_measurement: s
+              mode: box
+        zuschlag_dauer:
+          name: Zuschlag pro weiterem Termin (Sekunden)
+          description: >-
+            Werden mehrere Termine in einer App verkettet, verlaengert sich die
+            Dauer um diesen Wert pro weiterem Termin mit Text. 0 = kein Zuschlag.
+          default: 5
+          selector:
+            number:
+              min: 0
+              max: 60
+              unit_of_measurement: s
+              mode: box
+        max_dauer:
+          name: Maximale Dauer bei verketteten Terminen (Sekunden)
+          description: >-
+            Obergrenze fuer die Dauer inklusive Zuschlag. Eine Dauer, die eine
+            Regel selbst hoeher setzt, wird dadurch nicht gekuerzt.
+          default: 30
+          selector:
+            number:
+              min: 1
+              max: 300
+              unit_of_measurement: s
+              mode: box
         intervall:
           name: Abgleich-Intervall
           description: >-
@@ -205,6 +241,9 @@ variables:
   zeige_unbekannt: !input unbekannte_anzeigen
   std_app: !input standard_app
   std_icon: !input standard_icon
+  dauer_std: !input standard_dauer
+  dauer_zuschlag: !input zuschlag_dauer
+  dauer_max: !input max_dauer
   max_lifetime: 900
   ign_liste: >-
     {{ ignorieren_roh.split('\n') | map('trim') | reject('eq', '') | map('lower') | list }}
@@ -230,7 +269,7 @@ actions:
         {% set jetzt_ts = now().timestamp() %}
         {% set heute = now().strftime('%Y-%m-%d') %}
         {% set uhr = now().strftime('%H:%M') %}
-        {% set d = {'von': 0, 'bis': 0, 'tag_von': '00:00', 'tag_bis': '24:00', 'uhrzeit': true, 'duration': 10} %}
+        {% set d = {'von': 0, 'bis': 0, 'tag_von': '00:00', 'tag_bis': '24:00', 'uhrzeit': true, 'duration': dauer_std | int(10)} %}
         {% for kal_id, inhalt in kal.items() %}
         {% for ev in inhalt.events %}
         {% set titel = ev.summary | default('') | string %}
@@ -311,9 +350,13 @@ actions:
                     payload: >-
                       {% set e = t[0] %}
                       {% set texte = t | map(attribute='text') | select('ne', '') | list %}
+                      {# Dauer: groesste Regeldauer + Zuschlag pro weiterem Text, gedeckelt (Regeldauer ueber dem Maximum bleibt erhalten) #}
+                      {% set basis = t | map(attribute='duration') | max %}
+                      {% set extra = ([(texte | count) - 1, 0] | max) * (dauer_zuschlag | int(0)) %}
+                      {% set dauer = [basis + extra, [dauer_max | int(30), basis] | max] | min %}
                       {% set p = {
                         'icon': e.icon,
-                        'duration': e.duration,
+                        'duration': dauer | int,
                         'lifetime': [max_lifetime, (t | map(attribute='rest') | min)] | min | int
                       } %}
                       {# Leerer Text = Key weglassen (reines Icon) #}

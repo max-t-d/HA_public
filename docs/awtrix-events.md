@@ -26,7 +26,10 @@ HA-Start den Soll-Zustand neu:
      Mehrtägige ganztägige Termine laufen damit automatisch über alle Tage.
 4. Pro App werden alle aktiven Treffer zu **einem** Text mit ", " verkettet
    (z. B. `Geburtstag Oma, Geburtstag Opa`). Das Icon stammt vom ersten Treffer,
-   ganztägige vor zeitgebundenen, dann nach Startzeit.
+   ganztägige vor zeitgebundenen, dann nach Startzeit. Die Dauer ist die größte
+   Regeldauer plus ein Zuschlag pro weiterem Termin mit Text, gedeckelt auf das
+   Maximum (Standard 10 s + 5 s je weiterem Termin, höchstens 30 s). Eine Dauer,
+   die eine Regel selbst über dem Maximum setzt, bleibt erhalten.
 5. Pro App wird per `mqtt.publish` auf `<Prefix>/custom/<app>` gepusht oder, wenn
    nichts aktiv ist, mit leerem Payload entfernt.
 
@@ -42,7 +45,7 @@ Terminänderungen und bei Kalenderausfällen selbst.
 | AWTRIX MQTT-Prefix | z. B. `homeassistant/awtrix_ed5528` |
 | Ignorieren | Ein Begriff pro Zeile, "enthält", ohne Groß-/Kleinschreibung |
 | Regeln | Liste, ein Eintrag pro Regel (siehe unten) |
-| Erweitert | Termine ohne Regel anzeigen, deren App und Icon, Abgleich-Intervall |
+| Erweitert | Termine ohne Regel anzeigen, deren App und Icon, Standard-Dauer (10 s), Zuschlag pro weiterem Termin (5 s), Maximum (30 s), Abgleich-Intervall |
 
 Die Voreinstellungen im Blueprint sind Beispielregeln (Geburtstage, Sport,
 Feiertage). Die Icon-IDs sind LaMetric-IDs, Namen wie `ChristmasSleigh` müssen als
@@ -60,7 +63,7 @@ Datei auf der Uhr liegen. Die Ignorieren-Liste ist leer.
 | `von` / `bis` | Minuten relativ zu Start / Ende, nur Termine mit Uhrzeit (z. B. `-90`) |
 | `tag_von` / `tag_bis` | Anzeigefenster ganztägiger Termine (Standard 00:00 bis 24:00) |
 | `uhrzeit` | Startzeit an den Text hängen (`Schwimmen 17:30`), Standard an |
-| `duration` | Sekunden pro Durchlauf, Standard 10 |
+| `duration` | Sekunden pro Durchlauf, überschreibt die Standard-Dauer |
 | `color` | Optional, Textfarbe (z. B. `#FF0000`) |
 | `sound` | Optional, RTTTL-Name, läuft bei jedem Durchlauf der App |
 
